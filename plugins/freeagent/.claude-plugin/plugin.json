@@ -1,6 +1,6 @@
 {
   "name": "freeagent",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "FreeAgent accounting for Claude: an MCP server for timesheets (plan, apply, describe and show, with the grid shown before any write), and skills for expense import from the Outlook inbox, supplier bills and timesheet logging. The operator's own supplier and tenant rules stay in a private local file. Requires a FreeAgent OAuth app.",
   "author": {
     "name": "Tobias Lekman",
