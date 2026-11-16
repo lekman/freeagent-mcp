@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "freeagent": {
+      "command": "npx",
+      "args": ["-y", "@lekman/freeagent@latest", "mcp"]
+    }
+  }
+}

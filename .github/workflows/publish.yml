@@ -1,0 +1,84 @@
+name: Publish
+
+on:
+  # Called by cd.yml once Release Please has published a release, so the npm
+  # publish is gated on a merged release pull request rather than on a push.
+  workflow_call:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # Trusted publishing (OIDC): npm verifies this workflow's identity, so
+      # no NPM_TOKEN is stored anywhere. A repository that also holds
+      # accounting credentials is the last place to park a registry token.
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # No version input: setup-bun falls back to package.json and reads
+      # "packageManager" (bun@x.y.z). That is the single source of truth for
+      # the bun version, shared with mise via .mise.toml.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test with coverage
+        run: bun run test:coverage
+
+      - name: Build
+        run: bun run build
+
+      # Trusted publishing needs npm >= 11.5.1. The runner's bundled npm is
+      # decided by the Node build, not by us, so assert it rather than assume
+      # it — a silent fallback to token auth is exactly what this avoids.
+      - name: Require an npm that supports trusted publishing
+        run: |
+          set -euo pipefail
+          need=11.5.1
+          have=$(npm --version)
+          if [ "$(printf '%s\n%s\n' "$need" "$have" | sort -V | head -1)" != "$need" ]; then
+            echo "npm $have is below the $need required for trusted publishing" >&2
+            exit 1
+          fi
+          echo "npm $have satisfies >= $need"
+
+      - name: Restore the denylist from secrets
+        env:
+          CLIENT_TERMS: ${{ secrets.CLIENT_TERMS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLIENT_TERMS:-}" ]; then
+            echo "::error::CLIENT_TERMS is not set — refusing to publish unscanned."
+            exit 1
+          fi
+          printf '%s\n' "$CLIENT_TERMS" > scripts/client-terms.txt
+
+      - name: Check the packed tarball
+        run: ./scripts/check-tarball.sh --quiet
+
+      # No NODE_AUTH_TOKEN: OIDC supplies the credential, and publishConfig
+      # asks for provenance, which npm records for a public repository.
+      - name: Publish
+        run: npm publish

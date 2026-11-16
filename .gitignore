@@ -1,0 +1,19 @@
+.env
+token.json
+*.local
+.tmp/
+__pycache__/
+
+# Un-ignore the repo guide: a global gitignore hides CLAUDE.md by default.
+# This line and .tmp/ were fused into "!CLAUDE.md.tmp/" by a lost newline.
+# Harmless — .tmp/ above already covered the ledger, and the fused pattern
+# matched a directory that has never existed — but it read as intent.
+!CLAUDE.md
+
+# Build output and packing artefacts
+dist/
+node_modules/
+*.tgz
+
+# The client term list is the leak it prevents
+scripts/client-terms.txt

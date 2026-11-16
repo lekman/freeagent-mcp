@@ -1,0 +1,33 @@
+name: Auto Approve
+
+# Calls the shared approve workflow in lekman/devops-toolkit, which signs in
+# as a GitHub App rather than with a personal token. GitHub refuses a review
+# from the pull request's author, and release-please runs as the APP_ID app,
+# so the approval comes from a second app: the APPROVER_APP_ID variable and
+# the APPROVER_APP_PRIVATE_KEY secret.
+#
+# The shared workflow derives its path list from release-please-config.json
+# in .release/ or release/. This repository keeps its config at
+# .github/release-config.json, so the list is given here instead: exactly the
+# files a release pull request changes, including the plugin manifest that
+# release-config.json carries as an extra file.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  approve:
+    uses: lekman/devops-toolkit/.github/workflows/approve.yml@c0c824a81bb2c47428bb9a1f42552aa96065b029
+    secrets: inherit
+    with:
+      runner: ubuntu-latest
+      release-path-filters: |
+        .github/release-manifest.json
+        CHANGELOG.md
+        package.json
+        plugins/freeagent/.claude-plugin/plugin.json

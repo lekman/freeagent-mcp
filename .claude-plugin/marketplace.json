@@ -1,0 +1,26 @@
+{
+  "name": "lekman",
+  "metadata": {
+    "description": "FreeAgent accounting for Claude Code: an MCP server and the skills that use it"
+  },
+  "owner": {
+    "name": "Tobias Lekman",
+    "url": "https://github.com/lekman"
+  },
+  "plugins": [
+    {
+      "name": "freeagent",
+      "source": "./plugins/freeagent",
+      "description": "FreeAgent accounting for Claude: an MCP server for timesheets (plan, apply, describe and show, with the grid shown before any write), and skills for expense import from the Outlook inbox, supplier bills and timesheet logging. The operator's own supplier and tenant rules stay in a private local file. Requires a FreeAgent OAuth app.",
+      "category": "productivity",
+      "tags": [
+        "freeagent",
+        "accounting",
+        "mcp",
+        "timesheets",
+        "expenses",
+        "bills"
+      ]
+    }
+  ]
+}

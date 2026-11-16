@@ -1,0 +1,8 @@
+# CODEOWNERS for freeagent
+
+# Default owner for all files
+* @lekman
+
+# Release-related files owned by the release bot
+/CHANGELOG.md @app/lekman-release-please-bot
+/.github/release-manifest.json @app/lekman-release-please-bot

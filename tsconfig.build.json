@@ -1,0 +1,33 @@
+{
+  // Declarations only. Bun.build emits the JavaScript; tsc is here purely so
+  // the published package carries types. Without this the exports map points
+  // `types` at a file that `files` does not ship, and a TypeScript consumer
+  // gets no types at all while a Bun consumer fails to resolve the package.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    // nodenext here, bundler in the base config. The base is for editing and
+    // typechecking, where bundler matches how Bun resolves; the emit has to
+    // match how a published ESM package is consumed, which is nodenext.
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationDir": "dist",
+    // Explicit, not inferred. TypeScript 5 infers "src" from the include
+    // list; TypeScript 7 refuses to (TS5011) and the build stops. Naming
+    // it is correct under both and keeps the declaration layout stable if
+    // a file is ever added outside src.
+    "rootDir": "src",
+    // Source files import each other as "./x.ts". Left alone, the emitted
+    // declarations drop the extension, and a consumer on moduleResolution
+    // nodenext — the correct setting for an ESM package — gets TS2834 on
+    // every line of them. This rewrites the extension to ".js" on the way
+    // out, which is what nodenext expects and what resolves to the sibling
+    // ".d.ts". Verified by typechecking against the packed tarball.
+    "rewriteRelativeImportExtensions": true
+  },
+  // Only what ships. scripts and tests are in the root config for linting and
+  // typechecking; emitting declarations for them would put them in dist.
+  "include": ["src/**/*.ts"]
+}

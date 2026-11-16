@@ -1,0 +1,26 @@
+[test]
+coveragePathIgnorePatterns = [
+  "**/*.system.ts", # System wrappers — no business logic
+  "**/index.ts",    # Barrel re-exports — no business logic
+  "tests/**",
+  "**/*.test.ts",
+]
+
+# Lines are the real gate and they are absolute: every line here either shapes
+# an API request, decides whether to trust a credential, or decides whether a
+# payment counts as evidenced. None of it ships untested.
+#
+# Functions is a floor against gross regression only, and deliberately low.
+# Three things about this setting, all established by experiment because a
+# threshold that silently enforces nothing is worse than none:
+#   - the keys are PLURAL. `line`/`function` parse without complaint and are
+#     ignored, so the config reads as configured and holds nothing.
+#   - it applies PER FILE, not to the total.
+#   - a static-only class carries an implicit constructor nothing can call, so
+#     small utility classes cap out low: paging.ts has one method and can never
+#     exceed 66.67%. Past that point the number measures class size, not test
+#     quality, which is why it is not chased upward.
+#
+# Re-verify any change by setting a floor one point too high and confirming the
+# run fails. It has silently enforced nothing twice already.
+coverageThreshold = { lines = 1.0, functions = 0.66 }

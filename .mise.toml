@@ -1,0 +1,16 @@
+# Bun is required: the skills run the CLI straight from TypeScript source
+# (`bun "${CLAUDE_PLUGIN_ROOT}/src/bin/freeagent.ts"`), and the build, tests and
+# lint all go through bun. Node is needed for the published npm package, which
+# ships compiled JavaScript in dist/.
+#
+# No versions are pinned here on purpose. CI resolves the same two versions
+# from the same two places, so repeating the numbers here would let a
+# contributor's toolchain drift from the one that gates the PR:
+#
+#   node -> .node-version              (actions/setup-node, node-version-file)
+#   bun  -> package.json packageManager (oven-sh/setup-bun, its default lookup)
+#
+# `mise install` is all a new contributor needs.
+[settings]
+idiomatic_version_file_enable_tools = ["node", "bun"]
+lockfile = true

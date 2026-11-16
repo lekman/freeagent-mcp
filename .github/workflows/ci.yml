@@ -1,0 +1,134 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least privilege: this workflow only reads the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # No version input: setup-bun falls back to package.json and reads
+      # "packageManager" (bun@x.y.z). That is the single source of truth for
+      # the bun version, shared with mise via .mise.toml.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      # --ignore-scripts is the enforcement point for bun: unlike npm and
+      # pnpm it has no config flag, so the flag lives here or nowhere.
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test with coverage
+        run: bun run test:coverage
+
+      - name: Build
+        run: bun run build
+
+  runtime:
+    name: Built package on Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      # Both legs should report. A failure on the floor version is the useful
+      # signal, and fail-fast would hide it behind the newer one.
+      fail-fast: false
+      matrix:
+        # The floor declared in package.json engines, and the version the rest
+        # of CI builds on. Bump the floor here and in engines together.
+        node: ["24", "26"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Build
+        run: bun run build
+
+      # engines is a claim about the published artefact, so test the artefact,
+      # not the source. Nothing else in CI executes dist/ under Node at all.
+      # Exit 2 with the argument error proves the ESM bundle loaded and ran.
+      - name: Run the built CLI under Node ${{ matrix.node }}
+        run: |
+          set -uo pipefail
+          node --version
+          # GitHub runs this with `bash -e`, so a non-zero exit would abort the
+          # step before the check below. `|| rc=$?` keeps errexit out of it —
+          # a non-zero exit is the expected result here, not a failure.
+          rc=0
+          out=$(node dist/bin/freeagent.js timesheets show 2>&1) || rc=$?
+          echo "$out"
+          if [ "$rc" -ne 2 ]; then
+            echo "::error::expected exit 2 from the argument check, got $rc"
+            exit 1
+          fi
+          case "$out" in
+            *"--from is required"*) ;;
+            *) echo "::error::unexpected output from the built CLI"; exit 1 ;;
+          esac
+
+  tarball:
+    name: Publish safety
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # No version input: setup-bun falls back to package.json and reads
+      # "packageManager" (bun@x.y.z). That is the single source of truth for
+      # the bun version, shared with mise via .mise.toml.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Build
+        run: bun run build
+
+      # The denylist is gitignored, so CI has no terms unless supplied. A
+      # missing secret fails rather than skipping: a scan that passes because
+      # it had nothing to match on is the worst possible green.
+      - name: Restore the denylist from secrets
+        env:
+          CLIENT_TERMS: ${{ secrets.CLIENT_TERMS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLIENT_TERMS:-}" ]; then
+            echo "::error::CLIENT_TERMS is not set. The tarball scan cannot run, and must not pass by default."
+            exit 1
+          fi
+          printf '%s\n' "$CLIENT_TERMS" > scripts/client-terms.txt
+
+      # Check what ships, not only what is committed — an npm version cannot be unpublished after 72h.
+      # --quiet names the offending file but never the matching line.
+      - name: Check the packed tarball
+        run: ./scripts/check-tarball.sh --quiet
