@@ -61,9 +61,16 @@ jobs:
           required-labels: "autorelease: pending"
           label-match-mode: all
           path-filters: ".github/release-manifest.json,CHANGELOG.md,package.json,plugins/freeagent/.claude-plugin/plugin.json"
+          merge-method: squash
 
-      - name: Enable auto-merge
+      # Auto-merge is enabled as the approver app, not as github-actions.
+      # Code-owner review stays on for every other pull request, and GitHub
+      # does not accept an app as a code owner, so a release pull request is
+      # merged under the app's pull-request bypass on the Protected ruleset.
+      # The step above has already refused anything outside the four release
+      # files, and the Checks ruleset still requires CI to pass.
+      - name: Enable auto-merge as the approver
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr merge "$PR_URL" --auto --squash || true
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: gh pr merge "$PR_URL" --auto --squash
