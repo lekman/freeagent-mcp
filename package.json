@@ -1,6 +1,6 @@
 {
   "name": "@lekman/freeagent",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "FreeAgent API client: OAuth token lifecycle and typed reads over invoices, bills, expenses and timeslips.",
   "license": "MIT",
   "author": "Tobias Lekman",
