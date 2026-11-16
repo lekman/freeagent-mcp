@@ -1,33 +1,69 @@
 name: Auto Approve
 
-# Calls the shared approve workflow in lekman/devops-toolkit, which signs in
-# as a GitHub App rather than with a personal token. GitHub refuses a review
-# from the pull request's author, and release-please runs as the APP_ID app,
-# so the approval comes from a second app: the APPROVER_APP_ID variable and
-# the APPROVER_APP_PRIVATE_KEY secret.
+# Approves release-please pull requests as the approver GitHub App, never with
+# a personal token. These are the steps of lekman/devops-toolkit's shared
+# approve workflow, written out here because that repository is private and a
+# public repository cannot call a workflow from a private one.
 #
-# The shared workflow derives its path list from release-please-config.json
-# in .release/ or release/. This repository keeps its config at
-# .github/release-config.json, so the list is given here instead: exactly the
-# files a release pull request changes, including the plugin manifest that
-# release-config.json carries as an extra file.
+# GitHub refuses a review from the pull request's author, and release-please
+# runs as the APP_ID app, so the approval comes from a second app: the
+# APPROVER_APP_ID variable and the APPROVER_APP_PRIVATE_KEY secret.
+#
+# The gate moves rather than disappears. Approval is conditional on the author,
+# the label and the exact files touched; a release pull request that reached
+# for anything else fails those checks and waits for a human.
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, synchronize, reopened]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
-  approve:
-    uses: lekman/devops-toolkit/.github/workflows/approve.yml@c0c824a81bb2c47428bb9a1f42552aa96065b029
-    secrets: inherit
-    with:
-      runner: ubuntu-latest
-      release-path-filters: |
-        .github/release-manifest.json
-        CHANGELOG.md
-        package.json
-        plugins/freeagent/.claude-plugin/plugin.json
+  release-please:
+    name: Approve Release PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    if: startsWith(github.head_ref, 'release-please--')
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Generate the approver token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.APPROVER_APP_ID }}
+          private-key: ${{ secrets.APPROVER_APP_PRIVATE_KEY }}
+
+      - name: Check the approver is not the author
+        shell: bash
+        env:
+          APPROVER: ${{ steps.app-token.outputs.app-slug }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          set -euo pipefail
+          if [ "${APPROVER}[bot]" = "$AUTHOR" ]; then
+            echo "::error title=Auto-Approve::the approving app and the pull request author are both '$AUTHOR'. Set APPROVER_APP_ID and APPROVER_APP_PRIVATE_KEY to a second GitHub App."
+            exit 1
+          fi
+          echo "::notice title=Auto-Approve::approving as ${APPROVER}[bot], author is $AUTHOR"
+
+      # The exact files a release pull request changes: the manifest, the
+      # changelog, package.json, and the plugin manifest that
+      # .github/release-config.json carries as an extra file.
+      - name: Approve Release PR
+        uses: lekman/auto-approve-action@7e3541665721018403435268702d9ae74860ec47 # v1
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          allowed-authors: app/lekman-release-please-bot
+          required-labels: "autorelease: pending"
+          label-match-mode: all
+          path-filters: ".github/release-manifest.json,CHANGELOG.md,package.json,plugins/freeagent/.claude-plugin/plugin.json"
+
+      - name: Enable auto-merge
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge "$PR_URL" --auto --squash || true

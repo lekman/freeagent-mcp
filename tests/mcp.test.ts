@@ -112,6 +112,45 @@ describe("MCP timesheet tools", () => {
     expect(http.requests.filter((q) => q.method === "POST")).toHaveLength(0);
   });
 
+  test("apply creates what the plan shows and reports the count", async () => {
+    const { call, http } = await connect([
+      OK({ timeslips: [] }),
+      ...Array.from({ length: 5 }, () => OK({ timeslip: { url: "new" } })),
+    ]);
+    const r = await call("timesheets_apply", {
+      from: "2026-08-17",
+      hours: { Acme: 40 },
+      to: "2026-08-21",
+    });
+    expect(r.isError).toBeFalsy();
+    expect(r.body.created).toBe(5);
+    expect(http.requests.filter((q) => q.method === "POST")).toHaveLength(5);
+  });
+
+  test("describe writes the comment and reports the count", async () => {
+    const { call, http } = await connect([
+      OK({
+        timeslips: [
+          {
+            dated_on: "2026-08-17",
+            hours: "8.0",
+            project: "https://p/acme",
+            url: "https://api.freeagent.com/v2/timeslips/7",
+          },
+        ],
+      }),
+      OK({ timeslip: { comment: "Release work" } }),
+    ]);
+    const r = await call("timesheets_describe", {
+      descriptions: [
+        { client: "Acme", comment: "Release work", date: "2026-08-17" },
+      ],
+    });
+    expect(r.body.described).toBe(1);
+    const put = http.requests.find((q) => q.method === "PUT");
+    expect(put?.url).toBe("https://api.freeagent.com/v2/timeslips/7");
+  });
+
   test("negative: an unknown client is a tool error, not a crash", async () => {
     const { call, http } = await connect([]);
     const r = await call("timesheets_plan", {
