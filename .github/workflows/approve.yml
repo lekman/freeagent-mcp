@@ -61,9 +61,10 @@ jobs:
           required-labels: "autorelease: pending"
           label-match-mode: all
           path-filters: ".github/release-manifest.json,CHANGELOG.md,package.json,plugins/freeagent/.claude-plugin/plugin.json"
+          merge-method: squash
 
       - name: Enable auto-merge
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr merge "$PR_URL" --auto --squash || true
+        run: gh pr merge "$PR_URL" --auto --squash
