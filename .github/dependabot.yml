@@ -1,6 +1,8 @@
 version: 2
 updates:
-  - package-ecosystem: "npm"
+  # bun, not npm: the lockfile is bun.lock, which the npm ecosystem cannot
+  # update ("Dependabot's npm_and_yarn ecosystem cannot update bun.lock").
+  - package-ecosystem: "bun"
     directory: "/"
     schedule:
       interval: "daily"
